@@ -9,8 +9,8 @@ gblink2.o: symbols.bin font.bin
 %.o: %.s
 	rgbasm -o $@ $<
 
-gblink2.gb: gblink2.o
-	rgblink -o $@ -n $(patsubst %.o,%.sym,$<) $<
+gblink2.gb: gblink2.o command-table.o
+	rgblink -o $@ -n $(patsubst %.gb,%.sym,$@) $^
 	rgbfix -v $@
 
 clean:

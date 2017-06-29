@@ -1,4 +1,6 @@
 rJOYP       EQU $ff00
+rSB         EQU $ff01
+rIF         EQU $ff0f
 rLCDC       EQU $ff40
 rSTAT       EQU $ff41
 rSCY        EQU $ff42
@@ -33,25 +35,27 @@ sq_1      EQU $0f
 sq_2      EQU $10
 sq_3      EQU $11
 
-disp_y    EQU $60
-disp_x    EQU $24
+RSYM: MACRO
+IF DEF(RSYM_FUNC)
+RSYM_END EQUS "_end_{RSYM_FUNC}_rom:\n"
+RSYM_DEF EQUS "{RSYM_FUNC}::\n\tds _end_{RSYM_FUNC}_rom - _{RSYM_FUNC}_rom\n"
+RSYM_END
+SECTION "code_ram",BSS
+RSYM_DEF
+PURGE RSYM_END
+PURGE RSYM_DEF
+PURGE RSYM_FUNC
+ENDC
 
-preset_y  EQU $30
-
-fixstr: MACRO
-	db \1
-REPT \2 - strlen(\1)
-	db 0
-ENDR
+RSYM_FUNC EQUS "\1"
+SECTION "code_rom",CODE
+_\1_rom:
 ENDM
-
-SECTION "vblank",HOME[$40]
-	jp vblank
 
 SECTION "boot",HOME[$100]
 	jp _start
 
-SECTION "main", HOME[$150]
+SECTION "main",HOME[$150]
 _start:
 	xor a
 	ldio [rLCDC], a
@@ -75,9 +79,19 @@ _start:
 	ld de, end_oam_dma_rom - oam_dma_rom
 	call copy
 
+	ld hl, command_table_rom
+	ld bc, command_table
+	ld de, $200
+	call copy
+
 	ld hl, oam
 	ld bc, $a0
 	call zero
+
+	ld hl, code_rom
+	ld bc, code_ram
+	ld de, end_code_rom - code_rom
+	call copy
 
 	ld hl, header_oam
 	ld bc, oam
@@ -95,19 +109,107 @@ _start:
 	ldio [rSCX], a
 	ld a, $93
 	ldio [rLCDC], a
-	ld a, $01
+	ld a, $09
 	ldio [rIE], a
 	ld a, $10
 	ldio [rSTAT], a
+	jp runloop
 
-	ei
-runloop:
+SECTION "code_ram",BSS
+code_ram::
+
+	RSYM runloop
+code_rom::
 	halt
 	nop
-	ld a, [down_buttons]
-	bit 0, a
-	jr runloop
+	ldio a, [rIF]
+	ld b, a
+	xor a
+	ldio [rIF], a
+	bit 3, b
+	call serial
+	bit 0, b
+	call nz, vblank
 
+	jr _runloop_rom
+
+	RSYM vblank
+	push af
+	push bc
+	call read_buttons
+	ld b, a
+	ld a, [down_buttons]
+	and a, b
+	ld a, b
+	ld [down_buttons], a
+	pop bc
+	pop af
+	ret
+
+	RSYM serial
+	push af
+	push bc
+	push hl
+	ldio a, [rSB]
+	ld l, a
+	ld h, $0
+	add hl, hl
+	ld bc, command_table
+	add hl, bc
+	inc hl
+	ld a, [hl-]
+	or a
+	jr z, .ret
+	ld b, a
+	ld a, [hl]
+	ld c, a
+	call _indirect_call
+.ret
+	pop hl
+	pop bc
+	pop af
+	ret
+
+	RSYM _indirect_call
+	push bc
+	ret
+
+	RSYM read_buttons
+	ld a, $20
+	ldio [rJOYP], a
+	ldio a, [rJOYP]
+	ldio a, [rJOYP]
+	ldio a, [rJOYP]
+	ldio a, [rJOYP]
+	cpl
+	and a, $f
+	swap a
+	ld b, a
+	ld a, $10
+	ldio [rJOYP], a
+	ldio a, [rJOYP]
+	ldio a, [rJOYP]
+	ldio a, [rJOYP]
+	ldio a, [rJOYP]
+	cpl
+	and a, $f
+	or a, b
+	ret
+
+	RSYM init_link
+	push af
+	ldio a, [rSB]
+	pop af
+	ret
+
+	RSYM test_null
+	ret
+
+end_code_rom:
+	ds 1 ; Make sure the symbol is in the right place
+	RSYM _
+
+SECTION "utils",HOME[$400]
 copy:
 	push hl
 	push bc
@@ -132,59 +234,6 @@ zero:
 	ld a, b
 	or a, c
 	jr nz, zero
-	ret
-
-vblank:
-	push af
-	push bc
-	push de
-	push hl
-	call read_buttons
-	ld b, a
-	ld a, [down_buttons]
-	and a, b
-	ld a, b
-	ld [down_buttons], a
-	jr nz, .reti
-REPT 6
-	ld a, [bc]
-	inc bc
-	or a
-	jr z, .none_\@
-	sub a, $b5
-	jr .write_\@
-.none_\@:
-	ld a, $2d
-.write_\@:
-	ld [hl+], a
-ENDR
-.reti:
-	pop hl
-	pop de
-	pop bc
-	pop af
-	reti
-
-read_buttons:
-	ld a, $20
-	ldio [rJOYP], a
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	cpl
-	and a, $f
-	swap a
-	ld b, a
-	ld a, $10
-	ldio [rJOYP], a
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	cpl
-	and a, $f
-	or a, b
 	ret
 
 header:
@@ -243,11 +292,13 @@ oam_dma_rom:
 	ret
 end_oam_dma_rom
 
-SECTION "ram",BSS
+SECTION "ram",BSS[$CC00]
 oam:
 	ds $a0
 down_buttons:
 	ds 1
+command_table:
+	ds $200
 
 SECTION "tilerom",HOME
 symbols:
