@@ -339,6 +339,8 @@ code_rom::
 	ld hl, arguments
 	ld d, a
 .loop:
+	ld a, $80
+	ldio [rSC], a
 	xor a
 	ld b, a
 	ld c, a
@@ -347,6 +349,8 @@ code_rom::
 	ld c, a
 	dec d
 	jr z, .write
+	ld a, $80
+	ldio [rSC], a
 	call wait_serial
 	ldio a, [rSB]
 	ld b, a
@@ -370,6 +374,7 @@ code_rom::
 	ld a, 4
 	call read_args
 	call dump_range
+	call wait_serial
 	pop af
 	ret
 
