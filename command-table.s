@@ -57,7 +57,7 @@ command_table_rom::
 	dw 0000  ; 36
 	dw 0000  ; 37
 	dw 0000  ; 38
-	dw 0000  ; 39
+	dw reload_rom_info ; 39
 	dw 0000  ; 3A
 	dw 0000  ; 3B
 	dw 0000  ; 3C

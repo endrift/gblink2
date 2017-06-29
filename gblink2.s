@@ -2,6 +2,7 @@ rJOYP       EQU $ff00
 rSB         EQU $ff01
 rIF         EQU $ff0f
 rLCDC       EQU $ff40
+rSTAT       EQU $ff41
 rSCY        EQU $ff42
 rSCX        EQU $ff43
 rDMA        EQU $ff46
@@ -10,9 +11,11 @@ rOBP0       EQU $ff48
 rOBP1       EQU $ff49
 rIE         EQU $ffff
 
-size_font	  EQU $0600
-size_symbols  EQU $0200
-tilemap       EQU $9800
+size_font	      EQU $0600
+size_symbols      EQU $0200
+tilemap           EQU $9800
+template_tilemap  EQU $98A1
+game_name         EQU $98E3
 
 name      EQUS "GBlink2"
 sq_0      EQU $00
@@ -80,6 +83,11 @@ _start:
 	ld bc, $03C0
 	call zero
 
+	ld hl, template_text
+	ld bc, template_tilemap
+	ld de, end_template_text - template_text
+	call copy
+
 	ld hl, oam_dma_rom
 	ld bc, oam_dma
 	ld de, end_oam_dma_rom - oam_dma_rom
@@ -118,8 +126,6 @@ _start:
 	ldio [rSCX], a
 	ld a, $93
 	ldio [rLCDC], a
-	ld a, $09
-	ldio [rIE], a
 	jp runloop
 
 SECTION "code_ram",BSS
@@ -127,6 +133,8 @@ code_ram::
 
 	RSYM runloop
 code_rom::
+	ld a, $09
+	ldio [rIE], a
 	halt
 	ldio a, [rIF]
 	ld b, a
@@ -213,21 +221,15 @@ code_rom::
 .active:
 	ldio [rSB], a
 	ld a, b
-	inc a
+	ld b, 1
+	xor b
 	ld [link_active], a
 	dec a
 	or a
 	jr z, .ret
-	SET_RAM range_start, $147
-	SET_RAM range_size, 3
-	call wait_serial
-	call dump_range
-	SET_RAM range_start, $14d
-	SET_RAM range_size, 2
-	call wait_serial
-	call dump_range
-	SET_RAM range_start, $134
-	SET_RAM range_size, $10
+	call reload_rom_info
+	SET_RAM range_start, rom_info
+	SET_RAM range_size, $15
 	call wait_serial
 	call dump_range
 	xor a
@@ -255,7 +257,8 @@ code_rom::
 .active:
 	ldio [rSB], a
 	ld a, b
-	inc a
+	ld b, 1
+	xor b
 	ld [link_active], a
 	ret
 
@@ -288,16 +291,21 @@ code_rom::
 
 	RSYM wait_serial
 	push af
-.loop:
+	ld a, $8
+	ld [rIE], a
 	halt
-	ld a, [rIF]
-	bit 3, a
-	jr nz, .ret
-	jr .loop
-.ret:
-	res 3, a
+	xor a
 	ld [rIF], a
 	pop af
+	ret
+
+	RSYM wait_vram
+	push hl
+	ld hl, rSTAT
+.loop
+	bit 1, [hl]
+	jr nz, .loop
+	pop hl
 	ret
 
 	RSYM read_args
@@ -353,6 +361,118 @@ code_rom::
 	pop af
 	ld sp, hl
 	ld [bc], a
+	pop bc
+	pop af
+	ret
+
+	RSYM reload_rom_info
+	push af
+	push bc
+	push de
+	push hl
+	ld hl, rom_info
+	ld bc, $147
+	ld a, [bc]
+	ld [hl+], a
+	inc bc
+	ld a, [bc]
+	ld [hl+], a
+	inc bc
+	ld a, [bc]
+	ld [hl+], a
+	inc bc
+
+	ld bc, $14e
+	ld a, [bc]
+	ld [hl+], a
+	inc bc
+	ld a, [bc]
+	ld [hl+], a
+	inc bc
+
+	ld de, game_name
+	call wait_vram
+	ld bc, $134
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	inc bc
+	inc de
+	ld a, [bc]
+	ld [hl+], a
+	ld [de], a
+	pop hl
+	pop de
 	pop bc
 	pop af
 	ret
@@ -420,6 +540,10 @@ REPT ($13 - strlen("{name}")) / 2
 ENDR
 end_header:
 
+template_text:
+	db "Current game:"
+end_template_text:
+
 header_oam:
 	db $20, $4 + ($13 - strlen("{name}")) * 4
 	db tee_u, $0
@@ -453,8 +577,8 @@ down_buttons:
 	ds 1
 link_active:
 	ds 1
-sp_storage:
-	ds 2
+rom_info:
+	ds $15
 arguments:
 range_start:
 	ds 2
