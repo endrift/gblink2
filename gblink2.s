@@ -226,21 +226,14 @@ code_rom::
 	RSYM init_link
 	push af
 	ld a, [link_active]
-	or a
 	ld b, a
 	ld a, $1d
-	jr nz, .active
-	ld a, $b4
-.active:
 	ldio [rSB], a
 	ld a, $80
 	ldio [rSC], a
-	ld a, b
-	ld b, 1
-	xor b
+	ld a, 1
+	or b
 	ld [link_active], a
-	dec a
-	or a
 	jr z, .ret
 	call reload_rom_info
 	SET_RAM range_start, rom_info
@@ -252,7 +245,7 @@ code_rom::
 	ldio [rSB], a
 	ld a, $80
 	ldio [rSC], a
-	cpl
+	ld a, $ff
 	call wait_serial
 	ldio [rSB], a
 	ld a, $80
@@ -268,19 +261,15 @@ code_rom::
 	RSYM init_link_2
 	push af
 	ld a, [link_active]
-	or a
 	ld b, a
 	ld a, $1d
-	jr nz, .active
-	ld a, $b4
-.active:
 	ldio [rSB], a
 	ld a, $80
 	ldio [rSC], a
-	ld a, b
-	ld b, 1
-	xor b
+	ld a, 1
+	or b
 	ld [link_active], a
+	pop af
 	ret
 
 	RSYM dump_range
@@ -298,14 +287,21 @@ code_rom::
 .loop:
 	ld a, [hl+]
 	dec bc
-	ld [rSB], a
+	ldio [rSB], a
 	ld a, $80
 	ldio [rSC], a
 	xor a
 	or b
 	or c
-	call nz, wait_serial
-	jr nz, .loop
+	jr z, .ret
+	call wait_serial
+	ldio a, [rSB]
+	ld d, $90
+	and d
+	cp d
+	jr z, .ret
+	jr .loop
+.ret:
 	pop hl
 	pop de
 	pop bc
@@ -315,19 +311,23 @@ code_rom::
 	RSYM wait_serial
 	push af
 	ld a, $8
-	ld [rIE], a
+	ldio [rIE], a
 	halt
 	xor a
-	ld [rIF], a
+	ldio [rIF], a
 	pop af
 	ret
 
 	RSYM wait_vram
 	push hl
 	ld hl, rSTAT
-.loop
+	xor a
+.m0
+	cp a, [hl]
+	jr nc, .m0
+.m2
 	bit 1, [hl]
-	jr nz, .loop
+	jr nz, .m2
 	pop hl
 	ret
 
@@ -343,12 +343,12 @@ code_rom::
 	ld b, a
 	ld c, a
 	call wait_serial
-	ld a, [rSB]
+	ldio a, [rSB]
 	ld c, a
 	dec d
 	jr z, .write
 	call wait_serial
-	ld a, [rSB]
+	ldio a, [rSB]
 	ld b, a
 	dec d
 .write:
