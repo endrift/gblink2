@@ -231,34 +231,24 @@ code_rom::
 
 	RSYM init_link
 	push af
+	call reload_rom_info
 	ld a, [link_active]
 	ld b, a
 	ld a, $1d
-	ldio [rSB], a
-	ld a, $80
-	ldio [rSC], a
+	call write_byte
 	ld a, 1
 	or b
 	ld [link_active], a
 	jr z, .ret
-	call reload_rom_info
 	SET_RAM range_start, rom_info
 	SET_RAM range_size, $15
-	call wait_serial
 	call dump_range
 	xor a
-	call wait_serial
-	ldio [rSB], a
-	ld a, $80
-	ldio [rSC], a
+	call write_byte
 	ld a, $ff
-	call wait_serial
-	ldio [rSB], a
-	ld a, $80
-	ldio [rSC], a
+	call write_byte
 	SET_RAM range_start, 0
 	SET_RAM range_size, $4000
-	call wait_serial
 	call dump_range
 .ret:
 	pop af
@@ -290,22 +280,26 @@ code_rom::
 	ld sp, hl
 	ld h, d
 	ld l, e
+	ld e, c
 .loop:
 	ld a, [hl+]
 	dec bc
-	ldio [rSB], a
-	ld a, $80
-	ldio [rSC], a
+	call exc_byte
+	ld d, a
 	xor a
 	or b
 	or c
 	jr z, .ret
-	call wait_serial
-	ldio a, [rSB]
+	ld a, d
 	ld d, $90
+	xor d      ; needs to clear top bits
+	ld d, $f0
 	and d
-	cp d
-	jr z, .ret
+	jr nz, .loop
+	ld a, e
+	dec a
+	sub c      ; needs to be nonzero to exit
+	jr nz, .ret
 	jr .loop
 .ret:
 	pop hl
@@ -314,12 +308,31 @@ code_rom::
 	pop af
 	ret
 
+	RSYM write_byte
+	ldio [rSB], a
+	call wait_serial
+	ret
+
+	RSYM read_byte
+	call wait_serial
+	ldio a, [rSB]
+	ret
+
+	RSYM exc_byte
+	ldio [rSB], a
+	call wait_serial
+	ldio a, [rSB]
+	ret
+
 	RSYM wait_serial
 	push af
 	ld a, $8
 	ldio [rIE], a
+	ld a, $80
+	ldio [rSC], a
 	halt
-	xor a
+	ldio a, [rIF]
+	res 3, a
 	ldio [rIF], a
 	pop af
 	ret
@@ -345,20 +358,13 @@ code_rom::
 	ld hl, arguments
 	ld d, a
 .loop:
-	ld a, $80
-	ldio [rSC], a
 	xor a
 	ld b, a
-	ld c, a
-	call wait_serial
-	ldio a, [rSB]
+	call read_byte
 	ld c, a
 	dec d
 	jr z, .write
-	ld a, $80
-	ldio [rSC], a
-	call wait_serial
-	ldio a, [rSB]
+	call read_byte
 	ld b, a
 	dec d
 .write:
@@ -381,7 +387,6 @@ code_rom::
 	call read_args
 	SET_RAM range_size, $1
 	call dump_range
-	call wait_serial
 	pop af
 	ret
 
@@ -390,7 +395,6 @@ code_rom::
 	ld a, 4
 	call read_args
 	call dump_range
-	call wait_serial
 	pop af
 	ret
 
