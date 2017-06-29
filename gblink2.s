@@ -114,9 +114,6 @@ _start:
 	ld bc, $a0
 	call zero
 
-	xor a
-	ld [link_active], a
-
 	ld hl, code_rom
 	ld bc, code_ram
 	ld de, end_code_rom - code_rom
@@ -229,17 +226,17 @@ code_rom::
 	or a, b
 	ret
 
-	RSYM init_link
-	push af
+	RSYM test_link
+	push bc
 	call reload_rom_info
-	ld a, [link_active]
-	ld b, a
 	ld a, $1d
 	call write_byte
-	ld a, 1
-	or b
-	ld [link_active], a
-	jr z, .ret
+	pop bc
+	ret
+
+	RSYM init_link
+	push af
+	call test_link
 	SET_RAM range_start, rom_info
 	SET_RAM range_size, $15
 	call dump_range
@@ -256,15 +253,7 @@ code_rom::
 
 	RSYM init_link_2
 	push af
-	ld a, [link_active]
-	ld b, a
-	ld a, $1d
-	ldio [rSB], a
-	ld a, $80
-	ldio [rSC], a
-	ld a, 1
-	or b
-	ld [link_active], a
+	call test_link
 	pop af
 	ret
 
@@ -672,8 +661,6 @@ oam:
 mbc_table::
 	ds $340
 down_buttons:
-	ds 1
-link_active:
 	ds 1
 rom_info:
 	ds $15
