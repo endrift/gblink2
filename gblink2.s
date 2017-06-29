@@ -1,5 +1,6 @@
 rJOYP       EQU $ff00
 rSB         EQU $ff01
+rSC         EQU $ff02
 rIF         EQU $ff0f
 rLCDC       EQU $ff40
 rSTAT       EQU $ff41
@@ -15,7 +16,8 @@ size_font	      EQU $0600
 size_symbols      EQU $0200
 tilemap           EQU $9800
 template_tilemap  EQU $98A1
-game_name         EQU $98E3
+game_name         EQU $98E1
+mbc_name          EQU $9981
 
 name      EQUS "GBlink2"
 sq_0      EQU $00
@@ -98,6 +100,11 @@ _start:
 	ld de, $200
 	call copy
 
+	ld hl, mbc_table_rom
+	ld bc, mbc_table
+	ld de, end_mbc_table_rom - mbc_table_rom
+	call copy
+
 	ld hl, oam
 	ld bc, $a0
 	call zero
@@ -135,6 +142,10 @@ code_ram::
 code_rom::
 	ld a, $09
 	ldio [rIE], a
+	ld a, $b4
+	ldio [rSB], a
+	ld a, $80
+	ldio [rSC], a
 	halt
 	ldio a, [rIF]
 	ld b, a
@@ -156,6 +167,8 @@ code_rom::
 	and a, b
 	ld a, b
 	ld [down_buttons], a
+	bit 3, a
+	call nz, reload_rom_info
 	pop bc
 	pop af
 	ret
@@ -220,6 +233,8 @@ code_rom::
 	ld a, $b4
 .active:
 	ldio [rSB], a
+	ld a, $80
+	ldio [rSC], a
 	ld a, b
 	ld b, 1
 	xor b
@@ -235,9 +250,13 @@ code_rom::
 	xor a
 	call wait_serial
 	ldio [rSB], a
+	ld a, $80
+	ldio [rSC], a
 	cpl
 	call wait_serial
 	ldio [rSB], a
+	ld a, $80
+	ldio [rSC], a
 	SET_RAM range_start, 0
 	SET_RAM range_size, $4000
 	call wait_serial
@@ -256,6 +275,8 @@ code_rom::
 	ld a, $b4
 .active:
 	ldio [rSB], a
+	ld a, $80
+	ldio [rSC], a
 	ld a, b
 	ld b, 1
 	xor b
@@ -278,6 +299,8 @@ code_rom::
 	ld a, [hl+]
 	dec bc
 	ld [rSB], a
+	ld a, $80
+	ldio [rSC], a
 	xor a
 	or b
 	or c
@@ -471,6 +494,26 @@ code_rom::
 	ld a, [bc]
 	ld [hl+], a
 	ld [de], a
+
+	ld a, [rom_info]
+	ld c, a
+	xor a
+	ld b, a
+	ld hl, mbc_table
+	add hl, bc
+	add hl, bc
+	ld a, [hl+]
+	ld c, a
+	ld b, [hl]
+	ld hl, mbc_name
+.loop
+	ld a, [bc]
+	or a
+	jr z, .ret
+	inc bc
+	ld [hl+], a
+	jr .loop
+.ret:
 	pop hl
 	pop de
 	pop bc
@@ -540,8 +583,20 @@ REPT ($13 - strlen("{name}")) / 2
 ENDR
 end_header:
 
+underline: MACRO
+	db \1
+	ds 31 - strlen(\1)
+REPT 32
+	db line_h
+ENDR
+	ds 1
+ENDM
+
+
 template_text:
-	db "Current game:"
+	underline "Current game:"
+	ds $60
+	underline "Cartridge type:"
 end_template_text:
 
 header_oam:
@@ -568,11 +623,13 @@ oam_dma_rom:
 	ret
 end_oam_dma_rom
 
-SECTION "ram",BSS[$CC00]
+SECTION "ram",BSS[$C800]
 command_table:
 	ds $200
 oam:
 	ds $a0
+mbc_table::
+	ds $340
 down_buttons:
 	ds 1
 link_active:
