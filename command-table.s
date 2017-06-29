@@ -41,7 +41,7 @@ command_table_rom::
 	dw 0000  ; 26
 	dw 0000  ; 27
 	dw 0000  ; 28
-	dw 0000  ; 29
+	dw do_call ; 29
 	dw 0000  ; 2A
 	dw 0000  ; 2B
 	dw 0000  ; 2C
@@ -74,7 +74,7 @@ command_table_rom::
 	dw 0000  ; 47
 	dw 0000  ; 48
 	dw write_1 ; 49
-	dw 0000  ; 4A
+	dw read_1 ; 4A
 	dw 0000  ; 4B
 	dw 0000  ; 4C
 	dw 0000  ; 4D

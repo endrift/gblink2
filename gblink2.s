@@ -95,6 +95,11 @@ _start:
 	ld de, end_oam_dma_rom - oam_dma_rom
 	call copy
 
+	ld hl, indirect_call_rom
+	ld bc, indirect_call
+	ld de, end_indirect_call_rom - indirect_call_rom
+	call copy
+
 	ld hl, command_table_rom
 	ld bc, command_table
 	ld de, $200
@@ -134,6 +139,11 @@ _start:
 	ld a, $93
 	ldio [rLCDC], a
 	jp runloop
+
+indirect_call_rom:
+	push bc
+	ret
+end_indirect_call_rom:
 
 SECTION "code_ram",BSS
 code_ram::
@@ -190,15 +200,11 @@ code_rom::
 	ld b, a
 	ld a, [hl]
 	ld c, a
-	call _indirect_call
+	call indirect_call
 .ret
 	pop hl
 	pop bc
 	pop af
-	ret
-
-	RSYM _indirect_call
-	push bc
 	ret
 
 	RSYM read_buttons
@@ -369,6 +375,16 @@ code_rom::
 	pop af
 	ret
 
+	RSYM read_1
+	push af
+	ld a, 2
+	call read_args
+	SET_RAM range_size, $1
+	call dump_range
+	call wait_serial
+	pop af
+	ret
+
 	RSYM read_x
 	push af
 	ld a, 4
@@ -389,6 +405,22 @@ code_rom::
 	pop af
 	ld sp, hl
 	ld [bc], a
+	pop bc
+	pop af
+	ret
+
+	RSYM do_call
+	push af
+	push bc
+	push hl
+	ld a, 2
+	call read_args
+	ld hl, arguments
+	ld a, [hl+]
+	ld c, a
+	ld b, [hl]
+	call indirect_call
+	pop hl
 	pop bc
 	pop af
 	ret
@@ -662,3 +694,5 @@ tiles:
 SECTION "oam_dma",HRAM
 oam_dma:
 	ds end_oam_dma_rom - oam_dma_rom
+indirect_call:
+	ds end_indirect_call_rom - indirect_call_rom
