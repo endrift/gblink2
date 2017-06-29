@@ -73,7 +73,7 @@ command_table_rom::
 	dw 0000  ; 46
 	dw 0000  ; 47
 	dw 0000  ; 48
-	dw 0000  ; 49
+	dw write_1 ; 49
 	dw 0000  ; 4A
 	dw 0000  ; 4B
 	dw 0000  ; 4C
@@ -89,7 +89,7 @@ command_table_rom::
 	dw 0000  ; 56
 	dw 0000  ; 57
 	dw 0000  ; 58
-	dw 0000  ; 59
+	dw read_x ; 59
 	dw 0000  ; 5A
 	dw 0000  ; 5B
 	dw 0000  ; 5C
@@ -154,8 +154,8 @@ command_table_rom::
 	dw 0000  ; 97
 	dw 0000  ; 98
 	dw 0000  ; 99
-	dw init_link  ; 9A
-	dw 0000  ; 9B
+	dw init_link   ; 9A
+	dw init_link_2 ; 9B
 	dw 0000  ; 9C
 	dw 0000  ; 9D
 	dw 0000  ; 9E

@@ -2,7 +2,6 @@ rJOYP       EQU $ff00
 rSB         EQU $ff01
 rIF         EQU $ff0f
 rLCDC       EQU $ff40
-rSTAT       EQU $ff41
 rSCY        EQU $ff42
 rSCX        EQU $ff43
 rDMA        EQU $ff46
@@ -52,6 +51,13 @@ SECTION "code_rom",CODE
 _\1_rom:
 ENDM
 
+SET_RAM: MACRO
+	ld a, \2 & $FF
+	ld [\1], a
+	ld a, \2 >> 8
+	ld [\1 + 1], a
+ENDM
+
 SECTION "boot",HOME[$100]
 	jp _start
 
@@ -88,6 +94,9 @@ _start:
 	ld bc, $a0
 	call zero
 
+	xor a
+	ld [link_active], a
+
 	ld hl, code_rom
 	ld bc, code_ram
 	ld de, end_code_rom - code_rom
@@ -111,8 +120,6 @@ _start:
 	ldio [rLCDC], a
 	ld a, $09
 	ldio [rIE], a
-	ld a, $10
-	ldio [rSTAT], a
 	jp runloop
 
 SECTION "code_ram",BSS
@@ -121,13 +128,12 @@ code_ram::
 	RSYM runloop
 code_rom::
 	halt
-	nop
 	ldio a, [rIF]
 	ld b, a
 	xor a
 	ldio [rIF], a
 	bit 3, b
-	call serial
+	call nz, serial
 	bit 0, b
 	call nz, vblank
 
@@ -198,11 +204,157 @@ code_rom::
 
 	RSYM init_link
 	push af
-	ldio a, [rSB]
+	ld a, [link_active]
+	or a
+	ld b, a
+	ld a, $1d
+	jr nz, .active
+	ld a, $b4
+.active:
+	ldio [rSB], a
+	ld a, b
+	inc a
+	ld [link_active], a
+	dec a
+	or a
+	jr z, .ret
+	SET_RAM range_start, $147
+	SET_RAM range_size, 3
+	call wait_serial
+	call dump_range
+	SET_RAM range_start, $14d
+	SET_RAM range_size, 2
+	call wait_serial
+	call dump_range
+	SET_RAM range_start, $134
+	SET_RAM range_size, $10
+	call wait_serial
+	call dump_range
+	xor a
+	call wait_serial
+	ldio [rSB], a
+	cpl
+	call wait_serial
+	ldio [rSB], a
+	SET_RAM range_start, 0
+	SET_RAM range_size, $4000
+	call wait_serial
+	call dump_range
+.ret:
 	pop af
 	ret
 
-	RSYM test_null
+	RSYM init_link_2
+	push af
+	ld a, [link_active]
+	or a
+	ld b, a
+	ld a, $1d
+	jr nz, .active
+	ld a, $b4
+.active:
+	ldio [rSB], a
+	ld a, b
+	inc a
+	ld [link_active], a
+	ret
+
+	RSYM dump_range
+	push af
+	push bc
+	push de
+	push hl
+	ld hl, sp+0
+	ld sp, range_start
+	pop de
+	pop bc
+	ld sp, hl
+	ld h, d
+	ld l, e
+.loop:
+	ld a, [hl+]
+	dec bc
+	ld [rSB], a
+	xor a
+	or b
+	or c
+	call nz, wait_serial
+	jr nz, .loop
+	pop hl
+	pop de
+	pop bc
+	pop af
+	ret
+
+	RSYM wait_serial
+	push af
+.loop:
+	halt
+	ld a, [rIF]
+	bit 3, a
+	jr nz, .ret
+	jr .loop
+.ret:
+	res 3, a
+	ld [rIF], a
+	pop af
+	ret
+
+	RSYM read_args
+	push af
+	push bc
+	push de
+	push hl
+	ld hl, arguments
+	ld d, a
+.loop:
+	xor a
+	ld b, a
+	ld c, a
+	call wait_serial
+	ld a, [rSB]
+	ld c, a
+	dec d
+	jr z, .write
+	call wait_serial
+	ld a, [rSB]
+	ld b, a
+	dec d
+.write:
+	ld a, b
+	ld [hl+], a
+	ld a, c
+	ld [hl+], a
+	xor a
+	or d
+	jr nz, .loop
+	pop hl
+	pop de
+	pop bc
+	pop af
+	ret
+
+	RSYM read_x
+	push af
+	ld a, 4
+	call read_args
+	call dump_range
+	pop af
+	ret
+
+	RSYM write_1
+	push af
+	push bc
+	ld a, 3
+	call read_args
+	ld hl, sp+0
+	ld sp, range_start
+	pop bc
+	pop af
+	ld sp, hl
+	ld [bc], a
+	pop bc
+	pop af
 	ret
 
 end_code_rom:
@@ -293,12 +445,22 @@ oam_dma_rom:
 end_oam_dma_rom
 
 SECTION "ram",BSS[$CC00]
+command_table:
+	ds $200
 oam:
 	ds $a0
 down_buttons:
 	ds 1
-command_table:
-	ds $200
+link_active:
+	ds 1
+sp_storage:
+	ds 2
+arguments:
+range_start:
+	ds 2
+range_size:
+single_byte:
+	ds 2
 
 SECTION "tilerom",HOME
 symbols:
