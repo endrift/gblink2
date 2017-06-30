@@ -257,6 +257,25 @@ code_rom::
 	pop af
 	ret
 
+	RSYM increment_checksum
+	push bc
+	push hl
+	ld hl, sp+0
+	ld sp, checksum
+	pop bc
+	push hl
+	ld l, a
+	ld h, $00
+	add hl, bc
+	pop bc
+	push hl
+	ld hl, $0000
+	add hl, bc
+	ld sp, hl
+	pop hl
+	pop bc
+	ret
+
 	RSYM dump_range
 	push af
 	push bc
@@ -274,11 +293,7 @@ code_rom::
 	ld a, [hl+]
 	dec bc
 	ld d, a
-	ld a, [checksum]
-	add d
-	add d
-	xor d
-	ld [checksum], a
+	call increment_checksum
 	ld a, d
 	call exc_byte
 	ld d, a
@@ -400,7 +415,10 @@ code_rom::
 	call read_args
 	xor a
 	ld [checksum], a
+	ld [checksum + 1], a
 	call dump_range
+	ld a, [checksum + 1]
+	call write_byte
 	ld a, [checksum]
 	call write_byte
 	pop af
@@ -684,7 +702,7 @@ down_buttons:
 rom_info:
 	ds $15
 checksum:
-	ds 1
+	ds 2
 arguments:
 range_start:
 	ds 2
