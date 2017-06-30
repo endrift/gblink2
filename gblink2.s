@@ -273,6 +273,13 @@ code_rom::
 .loop:
 	ld a, [hl+]
 	dec bc
+	ld d, a
+	ld a, [checksum]
+	add d
+	add d
+	xor d
+	ld [checksum], a
+	ld a, d
 	call exc_byte
 	ld d, a
 	xor a
@@ -384,6 +391,18 @@ code_rom::
 	ld a, 4
 	call read_args
 	call dump_range
+	pop af
+	ret
+
+	RSYM read_x_ec
+	push af
+	ld a, 4
+	call read_args
+	xor a
+	ld [checksum], a
+	call dump_range
+	ld a, [checksum]
+	call write_byte
 	pop af
 	ret
 
@@ -664,6 +683,8 @@ down_buttons:
 	ds 1
 rom_info:
 	ds $15
+checksum:
+	ds 1
 arguments:
 range_start:
 	ds 2
