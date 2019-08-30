@@ -293,7 +293,7 @@ mbc_mbc3_rb:
 mbc_mbc3_tb:
 	db "MBC3+RTC",0
 mbc_mbc3_trb:
-	db "MBC7+RAM+RTC",0
+	db "MBC3+RAM+RTC",0
 mbc_mbc5:
 	db "MBC5",0
 mbc_mbc5_r:
