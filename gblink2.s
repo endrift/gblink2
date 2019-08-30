@@ -44,7 +44,7 @@ IF DEF(RSYM_FUNC)
 RSYM_END EQUS "_end_{RSYM_FUNC}_rom:\n"
 RSYM_DEF EQUS "{RSYM_FUNC}::\n\tds _end_{RSYM_FUNC}_rom - _{RSYM_FUNC}_rom\n"
 RSYM_END
-SECTION "code_ram",BSS
+SECTION "code_ram",WRAM0
 RSYM_DEF
 PURGE RSYM_END
 PURGE RSYM_DEF
@@ -52,7 +52,7 @@ PURGE RSYM_FUNC
 ENDC
 
 RSYM_FUNC EQUS "\1"
-SECTION "code_rom",CODE
+SECTION "code_rom",ROMX
 _\1_rom:
 ENDM
 
@@ -63,10 +63,10 @@ SET_RAM: MACRO
 	ld [\1 + 1], a
 ENDM
 
-SECTION "boot",HOME[$100]
+SECTION "boot",ROM0[$100]
 	jp _start
 
-SECTION "main",HOME[$150]
+SECTION "main",ROM0[$150]
 _start:
 	xor a
 	ldio [rLCDC], a
@@ -110,7 +110,7 @@ _start:
 	ld de, end_mbc_table_rom - mbc_table_rom
 	call copy
 
-	ld hl, oam
+	ld hl, oam_start
 	ld bc, $a0
 	call zero
 
@@ -120,7 +120,7 @@ _start:
 	call copy
 
 	ld hl, header_oam
-	ld bc, oam
+	ld bc, oam_start
 	ld de, end_header_oam - header_oam
 	call copy
 	call oam_dma
@@ -142,7 +142,7 @@ indirect_call_rom:
 	ret
 end_indirect_call_rom:
 
-SECTION "code_ram",BSS
+SECTION "code_ram",WRAM0
 code_ram::
 
 	RSYM runloop
@@ -591,7 +591,7 @@ end_code_rom:
 	ds 1 ; Make sure the symbol is in the right place
 	RSYM _
 
-SECTION "utils",HOME[$400]
+SECTION "utils",ROM0[$400]
 copy:
 	push hl
 	push bc
@@ -681,7 +681,7 @@ header_oam:
 end_header_oam:
 
 oam_dma_rom:
-	ld a, oam / $100
+	ld a, oam_start / $100
 	ld [rDMA], a
 	ld a, $28
 .loop
@@ -690,10 +690,10 @@ oam_dma_rom:
 	ret
 end_oam_dma_rom
 
-SECTION "ram",BSS[$C800]
+SECTION "ram",WRAM0[$C800]
 command_table:
 	ds $200
-oam:
+oam_start:
 	ds $a0
 mbc_table::
 	ds $340
@@ -710,7 +710,7 @@ range_size:
 single_byte:
 	ds 2
 
-SECTION "tilerom",HOME
+SECTION "tilerom",ROM0
 symbols:
 INCBIN "symbols.bin"
 font:
