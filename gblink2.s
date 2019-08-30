@@ -262,12 +262,12 @@ code_rom::
 	push hl
 	ld hl, sp+0
 	ld sp, checksum
-	pop bc
+	pop bc     ; replace checksum with stack pointer
 	push hl
-	ld l, a
+	ld l, a    ; add byte to checksum
 	ld h, $00
 	add hl, bc
-	pop bc
+	pop bc     ; restore checksum and stack pointer register
 	push hl
 	ld hl, $0000
 	add hl, bc
