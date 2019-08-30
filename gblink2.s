@@ -68,6 +68,7 @@ SECTION "boot",ROM0[$100]
 
 SECTION "main",ROM0[$150]
 _start:
+	di
 	xor a
 	ldio [rLCDC], a
 
@@ -149,11 +150,6 @@ code_ram::
 code_rom::
 	ld a, $09
 	ldio [rIE], a
-	ld a, $b4
-	ldio [rSB], a
-	ld a, $80
-	ldio [rSC], a
-	halt
 	ldio a, [rIF]
 	ld b, a
 	xor a
@@ -162,6 +158,12 @@ code_rom::
 	call nz, serial
 	bit 0, b
 	call nz, vblank
+
+	ld a, $b4
+	ldio [rSB], a
+	ld a, $80
+	ldio [rSC], a
+	halt
 
 	jr _runloop_rom
 
@@ -288,29 +290,17 @@ code_rom::
 	ld sp, hl
 	ld h, d
 	ld l, e
-	ld e, c
 .loop:
 	ld a, [hl+]
 	dec bc
 	ld d, a
 	call increment_checksum
 	ld a, d
-	call exc_byte
-	ld d, a
+	call write_byte
 	xor a
 	or b
 	or c
 	jr z, .ret
-	ld a, d
-	ld d, $90
-	xor d      ; needs to clear top bits
-	ld d, $f0
-	and d
-	jr nz, .loop
-	ld a, e
-	dec a
-	sub c      ; needs to be nonzero to exit
-	jr nz, .ret
 	jr .loop
 .ret:
 	pop hl
@@ -336,29 +326,23 @@ code_rom::
 	ret
 
 	RSYM wait_serial
-	push af
-	ld a, $8
-	ldio [rIE], a
 	ld a, $80
 	ldio [rSC], a
-	halt
-	ldio a, [rIF]
-	res 3, a
-	ldio [rIF], a
-	pop af
+.loop:
+	ldio a, [rSC]
+	bit 7, a
+	jr nz, .loop
 	ret
 
 	RSYM wait_vram
-	push hl
-	ld hl, rSTAT
-	xor a
-.m0
-	cp a, [hl]
-	jr nc, .m0
-.m2
-	bit 1, [hl]
-	jr nz, .m2
-	pop hl
+	push af
+	ld a, $1
+	ldio [rIE], a
+	halt
+	ldio a, [rIF]
+	res 0, a
+	ldio [rIF], a
+	pop af
 	ret
 
 	RSYM read_args
