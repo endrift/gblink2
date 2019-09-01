@@ -91,7 +91,7 @@ command_table_rom::
 	dw 0000  ; 58
 	dw read_x ; 59
 	dw 0000  ; 5A
-	dw read_x_ec ; 5B
+	dw 0000  ; 5B
 	dw 0000  ; 5C
 	dw 0000  ; 5D
 	dw 0000  ; 5E

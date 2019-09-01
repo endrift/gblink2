@@ -63,6 +63,15 @@ SET_RAM: MACRO
 	ld [\1 + 1], a
 ENDM
 
+WAIT_SERIAL: MACRO
+	ld a, $80
+	ldio [rSC], a
+.serloop:
+	ldio a, [rSC]
+	bit 7, a
+	jr nz, .serloop
+ENDM
+
 SECTION "boot",ROM0[$100]
 	jp _start
 
@@ -136,6 +145,8 @@ _start:
 	ldio [rSCX], a
 	ld a, $93
 	ldio [rLCDC], a
+	ld a, $09
+	ldio [rIE], a
 	jp runloop
 
 indirect_call_rom:
@@ -148,17 +159,24 @@ code_ram::
 
 	RSYM runloop
 code_rom::
-	ld a, $09
-	ldio [rIE], a
 	ldio a, [rIF]
-	ld b, a
-	xor a
-	ldio [rIF], a
-	bit 3, b
-	call nz, serial
-	bit 0, b
-	call nz, vblank
 
+.test3
+	bit 3, a
+	jr z, .test0
+	res 3, a
+	ldio [rIF], a
+	call serial_irq
+	jr .serial
+
+.test0
+	bit 0, a
+	jr z, .serial
+	res 0, a
+	ldio [rIF], a
+	call nz, vblank_irq
+
+.serial
 	ld a, $b4
 	ldio [rSB], a
 	ld a, $80
@@ -167,8 +185,7 @@ code_rom::
 
 	jr _runloop_rom
 
-	RSYM vblank
-	push af
+	RSYM vblank_irq
 	push bc
 	call read_buttons
 	ld b, a
@@ -179,11 +196,9 @@ code_rom::
 	bit 3, a
 	call nz, reload_rom_info
 	pop bc
-	pop af
 	ret
 
-	RSYM serial
-	push af
+	RSYM serial_irq
 	push bc
 	push hl
 	ldio a, [rSB]
@@ -203,7 +218,6 @@ code_rom::
 .ret
 	pop hl
 	pop bc
-	pop af
 	ret
 
 	RSYM read_buttons
@@ -259,25 +273,6 @@ code_rom::
 	pop af
 	ret
 
-	RSYM increment_checksum
-	push bc
-	push hl
-	ld hl, sp+0
-	ld sp, checksum
-	pop bc     ; replace checksum with stack pointer
-	push hl
-	ld l, a    ; add byte to checksum
-	ld h, $00
-	add hl, bc
-	pop bc     ; restore checksum and stack pointer register
-	push hl
-	ld hl, $0000
-	add hl, bc
-	ld sp, hl
-	pop hl
-	pop bc
-	ret
-
 	RSYM dump_range
 	push af
 	push bc
@@ -293,10 +288,36 @@ code_rom::
 .loop:
 	ld a, [hl+]
 	dec bc
-	ld d, a
-	call increment_checksum
-	ld a, d
-	call write_byte
+	ldio [rSB], a
+	WAIT_SERIAL
+	xor a
+	or b
+	or c
+	jr z, .ret
+	jr .loop
+.ret:
+	pop hl
+	pop de
+	pop bc
+	pop af
+	ret
+
+	RSYM load_range
+	push af
+	push bc
+	push de
+	push hl
+	ld hl, sp+0
+	ld sp, range_start
+	pop de
+	pop bc
+	ld sp, hl
+	ld h, d
+	ld l, e
+.loop:
+	call read_byte
+	ld [hl+], a
+	dec bc
 	xor a
 	or b
 	or c
@@ -311,35 +332,27 @@ code_rom::
 
 	RSYM write_byte
 	ldio [rSB], a
-	call wait_serial
+	WAIT_SERIAL
 	ret
 
 	RSYM read_byte
-	call wait_serial
+	WAIT_SERIAL
 	ldio a, [rSB]
 	ret
 
 	RSYM exc_byte
 	ldio [rSB], a
-	call wait_serial
+	WAIT_SERIAL
 	ldio a, [rSB]
-	ret
-
-	RSYM wait_serial
-	ld a, $80
-	ldio [rSC], a
-.loop:
-	ldio a, [rSC]
-	bit 7, a
-	jr nz, .loop
 	ret
 
 	RSYM wait_vram
 	push af
-	ld a, $1
-	ldio [rIE], a
+.halt
 	halt
 	ldio a, [rIF]
+	bit 0, a
+	jr z, .halt
 	res 0, a
 	ldio [rIF], a
 	pop af
@@ -390,21 +403,6 @@ code_rom::
 	ld a, 4
 	call read_args
 	call dump_range
-	pop af
-	ret
-
-	RSYM read_x_ec
-	push af
-	ld a, 4
-	call read_args
-	xor a
-	ld [checksum], a
-	ld [checksum + 1], a
-	call dump_range
-	ld a, [checksum + 1]
-	call write_byte
-	ld a, [checksum]
-	call write_byte
 	pop af
 	ret
 
@@ -685,8 +683,6 @@ down_buttons:
 	ds 1
 rom_info:
 	ds $15
-checksum:
-	ds 2
 arguments:
 range_start:
 	ds 2
