@@ -2,7 +2,7 @@ mbc: MACRO
 	dw mbc_table - mbc_table_rom + mbc_\1
 ENDM
 
-SECTION "mbc_table",DATA
+SECTION "mbc_table",ROMX
 mbc_table_rom::
 	mbc rom      ; 00
 	mbc mbc1     ; 01

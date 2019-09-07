@@ -1,4 +1,4 @@
-SECTION "command_table",DATA
+SECTION "command_table",ROMX
 command_table_rom::
 	dw 0000  ; 00
 	dw 0000  ; 01
