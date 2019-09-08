@@ -305,7 +305,7 @@ mbc_mbc5_v:
 mbc_mbc5_vr:
 	db "MBC5+RUMBLE+RAM",0
 mbc_mbc5_vrb:
-	db "MBC5+RUMBLE+RAM+BATTERY",0
+	db "MBC5+RUMBLE+RAM+BAT",0
 mbc_mbc6:
 	db "MBC6",0
 mbc_mbc7:

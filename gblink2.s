@@ -462,90 +462,44 @@ code_rom::
 	ld [hl+], a
 	inc bc
 
-	ld de, game_name
-	call wait_vram
+	ld d, 0
+	ld e, $10
 	ld bc, $134
+.nameloop:
 	ld a, [bc]
 	ld [hl+], a
-	ld [de], a
 	inc bc
-	inc de
+	cpl
+	or d
+	ld d, a
+	dec e
+	jr nz, .nameloop
+
+	ld hl, game_name
+	ld bc, rom_info + 5
+	ld e, $10
+	call wait_vram
+
+	xor a
+	or d
+	jr nz, .namecopy
+	ld bc, name_none
+
+.namecopy:
 	ld a, [bc]
 	ld [hl+], a
-	ld [de], a
 	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
-	inc bc
-	inc de
-	ld a, [bc]
-	ld [hl+], a
-	ld [de], a
+	dec e
+	jr nz, .namecopy
 
 	ld a, [rom_info]
 	ld c, a
+	xor a
+	or d
+	jr nz, .mbcload
+	ld bc, name_none
+	jr .copystart
+.mbcload:
 	xor a
 	ld b, a
 	ld hl, mbc_table
@@ -554,20 +508,31 @@ code_rom::
 	ld a, [hl+]
 	ld c, a
 	ld b, [hl]
+.copystart:
 	ld hl, mbc_name
-.loop
+	ld d, 20
+.copyloop
 	ld a, [bc]
 	or a
-	jr z, .ret
+	jr z, .zeroloop
 	inc bc
 	ld [hl+], a
-	jr .loop
+	dec d
+	jr .copyloop
+.zeroloop:
+	ld [hl+], a
+	dec d
+	jr nz, .zeroloop
+
 .ret:
 	pop hl
 	pop de
 	pop bc
 	pop af
 	ret
+
+	RSYM name_none
+	db "(no cartridge)",0
 
 end_code_rom:
 	ds 1 ; Make sure the symbol is in the right place
