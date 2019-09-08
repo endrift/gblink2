@@ -52,7 +52,7 @@ PURGE RSYM_FUNC
 ENDC
 
 RSYM_FUNC EQUS "\1"
-SECTION "code_rom",ROMX
+SECTION "code_rom",ROM0
 _\1_rom:
 ENDM
 
