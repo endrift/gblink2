@@ -159,31 +159,30 @@ code_ram::
 
 	RSYM runloop
 code_rom::
-	ldio a, [rIF]
-
-.test3
-	bit 3, a
-	jr z, .test0
-	res 3, a
-	ldio [rIF], a
-	call serial_irq
-	jr .serial
-
-.test0
-	bit 0, a
-	jr z, .serial
-	res 0, a
-	ldio [rIF], a
-	call nz, vblank_irq
-
 .serial
 	ld a, $b4
 	ldio [rSB], a
 	ld a, $80
 	ldio [rSC], a
-	halt
 
-	jr _runloop_rom
+.test
+	halt
+	ld hl, rIF
+	ld a, [hl]
+
+.test3
+	bit 3, a
+	jr z, .test0
+	res 3, [hl]
+	call serial_irq
+	jr .serial
+
+.test0
+	bit 0, a
+	jr z, .test
+	res 0, [hl]
+	call nz, vblank_irq
+	jr .test
 
 	RSYM vblank_irq
 	push bc
