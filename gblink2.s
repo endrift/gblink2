@@ -674,9 +674,9 @@ single_byte:
 
 SECTION "tilerom",ROM0
 symbols:
-INCBIN "symbols.bin"
+INCBIN "symbols.2bpp"
 font:
-INCBIN "font.bin"
+INCBIN "font.2bpp"
 
 SECTION "tiles",VRAM[$8000]
 tiles:
