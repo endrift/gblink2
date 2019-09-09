@@ -135,6 +135,9 @@ _start:
 	call copy
 	call oam_dma
 
+	xor a
+	ld [info_outdated], a
+
 	ld a, $c4
 	ldio [rBGP], a
 	ld a, $d4
@@ -194,6 +197,9 @@ code_rom::
 	ld [down_buttons], a
 	bit 3, a
 	call nz, reload_rom_info
+	ld a, [info_outdated]
+	or a
+	call nz, update_rom_info
 	pop bc
 	ret
 
@@ -345,18 +351,6 @@ code_rom::
 	ldio a, [rSB]
 	ret
 
-	RSYM wait_vram
-	push af
-.halt
-	halt
-	ldio a, [rIF]
-	bit 0, a
-	jr z, .halt
-	res 0, a
-	ldio [rIF], a
-	pop af
-	ret
-
 	RSYM read_args
 	push af
 	push bc
@@ -474,14 +468,35 @@ code_rom::
 	dec e
 	jr nz, .nameloop
 
-	ld hl, game_name
-	ld bc, rom_info + 5
-	ld e, $10
-	call wait_vram
-
 	xor a
 	or d
-	jr nz, .namecopy
+	ld a, 3
+	jr z, .mark_outdated
+	srl a
+.mark_outdated
+	ld [info_outdated], a
+	pop hl
+	pop de
+	pop bc
+	pop af
+	ret
+
+	RSYM update_rom_info
+	push bc
+	ld b, a
+	ldio a, [rSTAT]
+	and a, $3
+	cp a, $1
+	jr nz, .ret2
+	push de
+	push hl
+	ld hl, game_name
+	ld d, b
+	ld bc, rom_info + 5
+	ld e, $10
+
+	bit 1, d
+	jr z, .namecopy
 	ld bc, name_none
 
 .namecopy:
@@ -493,9 +508,8 @@ code_rom::
 
 	ld a, [rom_info]
 	ld c, a
-	xor a
-	or d
-	jr nz, .mbcload
+	bit 1, d
+	jr z, .mbcload
 	ld bc, name_none
 	jr .copystart
 .mbcload:
@@ -524,10 +538,12 @@ code_rom::
 	jr nz, .zeroloop
 
 .ret:
+	xor a
+	ld [info_outdated], a
 	pop hl
 	pop de
+.ret2:
 	pop bc
-	pop af
 	ret
 
 	RSYM name_none
@@ -647,6 +663,8 @@ down_buttons:
 	ds 1
 rom_info:
 	ds $15
+info_outdated:
+	ds 1
 arguments:
 range_start:
 	ds 2
