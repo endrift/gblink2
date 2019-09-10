@@ -489,7 +489,7 @@ code_rom::
 SECTION "code_rom",ROM0
 end_code_rom::
 
-SECTION "code_hram",ROM0
+SECTION "code_hram",ROM0[$80]
 code_hram::
 indirect_call_rom::
 	push bc
