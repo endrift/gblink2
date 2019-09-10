@@ -137,8 +137,8 @@ command_table_rom::
 	dw 0000  ; 86
 	dw 0000  ; 87
 	dw 0000  ; 88
-	dw 0000  ; 89
-	dw 0000  ; 8A
+	dw show_busy ; 89
+	dw hide_busy ; 8A
 	dw 0000  ; 8B
 	dw 0000  ; 8C
 	dw 0000  ; 8D
@@ -153,9 +153,9 @@ command_table_rom::
 	dw 0000  ; 96
 	dw 0000  ; 97
 	dw 0000  ; 98
-	dw 0000  ; 99
-	dw init_link   ; 9A
-	dw init_link_2 ; 9B
+	dw init_link_2 ; 99
+	dw init_link  ; 9A
+	dw 0000  ; 9B
 	dw 0000  ; 9C
 	dw 0000  ; 9D
 	dw 0000  ; 9E

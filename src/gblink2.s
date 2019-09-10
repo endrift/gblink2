@@ -38,6 +38,10 @@ tee_l     EQU $0e
 sq_1      EQU $0f
 sq_2      EQU $10
 sq_3      EQU $11
+clock_nw  EQU $12
+clock_sw  EQU $13
+clock_ne  EQU $14
+clock_se  EQU $15
 
 RSYM: MACRO
 IF DEF(RSYM_FUNC)
@@ -135,6 +139,11 @@ _start:
 	call copy
 	call oam_dma
 
+	ld hl, clock_oam
+	ld bc, clock_oam_buffer
+	ld de, end_clock_oam - clock_oam
+	call copy
+
 	xor a
 	ld [info_outdated], a
 
@@ -200,6 +209,9 @@ code_rom::
 	ld a, [info_outdated]
 	or a
 	call nz, update_rom_info
+	ld a, [oam_outdated]
+	or a
+	call nz, oam_dma
 	pop bc
 	ret
 
@@ -248,16 +260,9 @@ code_rom::
 	ret
 
 	RSYM test_link
-	push bc
 	call reload_rom_info
 	ld a, $1d
 	call write_byte
-	pop bc
-	ret
-
-	RSYM init_link
-	push af
-	call test_link
 	SET_RAM range_start, rom_info
 	SET_RAM range_size, $15
 	call dump_range
@@ -265,6 +270,11 @@ code_rom::
 	call write_byte
 	ld a, $ff
 	call write_byte
+	ret
+
+	RSYM init_link
+	push af
+	call test_link
 	SET_RAM range_start, 0
 	SET_RAM range_size, $4000
 	call dump_range
@@ -549,6 +559,46 @@ code_rom::
 	RSYM name_none
 	db "(no cartridge)",0
 
+	RSYM show_busy
+	push af
+	push bc
+	push de
+	push hl
+	ld hl, clock_oam_buffer
+	ld bc, oam_clock
+	ld d, $10
+.loop:
+	ld a, [hl+]
+	ld [bc], a
+	inc bc
+	dec d
+	jr nz, .loop
+	ld a, $1
+	ld [oam_outdated], a
+	pop hl
+	pop de
+	pop bc
+	pop af
+	ret
+
+	RSYM hide_busy
+	push af
+	push bc
+	push hl
+	ld hl, oam_clock
+	ld b, $10
+	xor a
+.loop:
+	ld [hl+], a
+	dec b
+	jr nz, .loop
+	ld a, $1
+	ld [oam_outdated], a
+	pop hl
+	pop bc
+	pop af
+	ret
+
 end_code_rom:
 	ds 1 ; Make sure the symbol is in the right place
 	RSYM _
@@ -581,6 +631,7 @@ zero:
 	ret
 
 header:
+; Row 0
 REPT ($14 - strlen("{name}")) / 2
 	db sq_1
 ENDR
@@ -594,11 +645,13 @@ REPT $1e - strlen("{name}")
 	db sq_1
 ENDR
 
+; Row 1
 	db line_v, "{name}", line_v
 REPT ($12 - strlen("{name}")) / 2 + $c
 	db sq_1
 ENDR
 
+; Row 2
 REPT ($13 - strlen("{name}")) / 2
 	db line_h
 ENDR
@@ -642,6 +695,20 @@ header_oam:
 	db line_v, $10
 end_header_oam:
 
+clock_oam:
+	db $12, $96
+	db clock_nw, $10
+
+	db $12, $9E
+	db clock_ne, $10
+
+	db $1A, $96
+	db clock_sw, $10
+
+	db $1A, $9E
+	db clock_se, $10
+end_clock_oam:
+
 oam_dma_rom:
 	ld a, oam_start / $100
 	ld [rDMA], a
@@ -649,6 +716,7 @@ oam_dma_rom:
 .loop
 	dec a
 	jr nz, .loop
+	ld [oam_outdated], a
 	ret
 end_oam_dma_rom
 
@@ -656,7 +724,13 @@ SECTION "ram",WRAM0[$C800]
 command_table:
 	ds $200
 oam_start:
-	ds $a0
+	ds $10
+oam_clock:
+	ds $10
+oam_reserved:
+	ds $80
+clock_oam_buffer:
+	ds $10
 mbc_table::
 	ds $340
 down_buttons:
@@ -664,6 +738,8 @@ down_buttons:
 rom_info:
 	ds $15
 info_outdated:
+	ds 1
+oam_outdated:
 	ds 1
 arguments:
 range_start:
