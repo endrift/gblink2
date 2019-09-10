@@ -23,3 +23,5 @@ template_tilemap::
 game_name::
 	ds $A0
 mbc_name::
+	ds $A0
+status::

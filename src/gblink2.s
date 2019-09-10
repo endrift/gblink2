@@ -32,13 +32,13 @@ _start:
 	ld de, end_header - header
 	call copy
 
-	ld hl, tilemap+end_header - header
+	ld hl, tilemap + end_header - header
 	ld bc, $03C0
 	call zero
 
 	ld hl, template_text
 	ld bc, template_tilemap
-	ld de, end_template_text - template_text
+	ld de, template_text.end - template_text
 	call copy
 
 	ld hl, oam_dma_rom
@@ -70,19 +70,26 @@ _start:
 	ld de, end_code_rom - code_rom
 	call copy
 
+	ld hl, clock_oam
+	ld bc, clock_oam_buffer
+	ld de, clock_oam.end - clock_oam
+	call copy
+
+	ld hl, extra_text
+	ld bc, extra_text_buffer
+	ld de, extra_text.end - extra_text
+	call copy
+
 	ld hl, header_oam
 	ld bc, oam_header
-	ld de, end_header_oam - header_oam
+	ld de, header_oam.end - header_oam
 	call copy
 	call oam_dma
 
-	ld hl, clock_oam
-	ld bc, clock_oam_buffer
-	ld de, end_clock_oam - clock_oam
-	call copy
-
 	xor a
 	ld [info_outdated], a
+	ld [oam_outdated], a
+	ld [status_outdated], a
 
 	ld a, $c4
 	ldio [rBGP], a
@@ -174,7 +181,10 @@ template_text:
 	underline "Current game:"
 	ds $60
 	underline "Cartridge type:"
-end_template_text:
+	ds $60
+	underline "Status:"
+	db "Disconnected"
+.end:
 
 header_oam:
 	db $20, $4 + ($13 - strlen("{name}")) * 4
@@ -188,21 +198,30 @@ header_oam:
 
 	db $18, $c + ($13 + strlen("{name}")) * 4
 	db line_v, $10
-end_header_oam:
+.end:
 
 clock_oam:
-	db $12, $96
-	db clock_nw, $10
+	db $8E, $96
+	db hourglass, $00
 
-	db $12, $9E
-	db clock_ne, $10
+	db $8E, $9E
+	db hourglass, $20
 
-	db $1A, $96
-	db clock_sw, $10
+	db $96, $96
+	db hourglass, $50
 
-	db $1A, $9E
-	db clock_se, $10
-end_clock_oam:
+	db $96, $9E
+	db hourglass, $70
+.end:
+
+extra_text::
+.busy::
+	db "Busy...",0
+.idle::
+	db "Idle",0
+.no_cart::
+	db "(no cartridge)",0
+.end:
 
 SECTION "tables",WRAM0
 command_table::
@@ -219,6 +238,8 @@ info_outdated::
 	ds 1
 oam_outdated::
 	ds 1
+status_outdated::
+	ds 1
 arguments::
 range_start::
 	ds 2
@@ -227,6 +248,10 @@ single_byte::
 	ds 2
 clock_oam_buffer::
 	ds $10
+status_buffer::
+	ds $10
+extra_text_buffer::
+	ds extra_text.end - extra_text
 
 SECTION "oam_buffer",WRAM0[$C000]
 oam_start::

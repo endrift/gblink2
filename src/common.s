@@ -31,10 +31,7 @@ tee_l     EQU $0e
 sq_1      EQU $0f
 sq_2      EQU $10
 sq_3      EQU $11
-clock_nw  EQU $12
-clock_sw  EQU $13
-clock_ne  EQU $14
-clock_se  EQU $15
+hourglass EQU $12
 
 SET_RAM: MACRO
 	ld a, \2 & $FF

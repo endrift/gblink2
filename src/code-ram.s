@@ -38,7 +38,9 @@ code_rom::
 	jr z, .test0
 	res 3, [hl]
 	call serial_irq
-	jr .serial
+	ld a, [rSC]
+	bit 7, a
+	jr z, .serial
 
 .test0
 	bit 0, a
@@ -57,12 +59,20 @@ code_rom::
 	ld [down_buttons], a
 	bit 3, a
 	call nz, reload_rom_info
+	ld a, [rSTAT]
+	and a, $3
+	cp a, $1
+	jr nz, .ret
 	ld a, [info_outdated]
 	or a
 	call nz, update_rom_info
 	ld a, [oam_outdated]
 	or a
 	call nz, oam_dma
+	ld a, [status_outdated]
+	or a
+	call nz, update_status
+.ret:
 	pop bc
 	ret
 
@@ -358,7 +368,7 @@ code_rom::
 
 	bit 1, d
 	jr z, .namecopy
-	ld bc, name_none
+	ld bc, extra_text.no_cart - extra_text + extra_text_buffer
 
 .namecopy:
 	ld a, [bc]
@@ -371,7 +381,7 @@ code_rom::
 	ld c, a
 	bit 1, d
 	jr z, .mbcload
-	ld bc, name_none
+	ld bc, extra_text.no_cart - extra_text + extra_text_buffer
 	jr .copystart
 .mbcload:
 	xor a
@@ -384,6 +394,30 @@ code_rom::
 	ld b, [hl]
 .copystart:
 	ld hl, mbc_name
+	call copy_string
+.ret:
+	xor a
+	ld [info_outdated], a
+	pop hl
+	pop de
+.ret2:
+	pop bc
+	ret
+
+	RSYM update_status
+	push bc
+	push hl
+	ld bc, status_buffer
+	ld hl, status
+	call copy_string
+	xor a
+	ld [status_outdated], a
+	pop hl
+	pop bc
+	ret
+
+	RSYM copy_string
+	push de
 	ld d, 20
 .copyloop
 	ld a, [bc]
@@ -397,18 +431,8 @@ code_rom::
 	ld [hl+], a
 	dec d
 	jr nz, .zeroloop
-
-.ret:
-	xor a
-	ld [info_outdated], a
-	pop hl
 	pop de
-.ret2:
-	pop bc
 	ret
-
-	RSYM name_none
-	db "(no cartridge)",0
 
 	RSYM show_busy
 	push af
@@ -426,6 +450,11 @@ code_rom::
 	jr nz, .loop
 	ld a, $1
 	ld [oam_outdated], a
+	ld bc, extra_text.busy - extra_text + extra_text_buffer
+	ld hl, status_buffer
+	call copy_string
+	ld a, $1
+	ld [status_outdated], a
 	pop hl
 	pop de
 	pop bc
@@ -445,6 +474,11 @@ code_rom::
 	jr nz, .loop
 	ld a, $1
 	ld [oam_outdated], a
+	ld bc, extra_text.idle - extra_text + extra_text_buffer
+	ld hl, status_buffer
+	call copy_string
+	ld a, $1
+	ld [status_outdated], a
 	pop hl
 	pop bc
 	pop af
