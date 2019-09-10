@@ -1,83 +1,20 @@
-rJOYP       EQU $ff00
-rSB         EQU $ff01
-rSC         EQU $ff02
-rIF         EQU $ff0f
-rLCDC       EQU $ff40
-rSTAT       EQU $ff41
-rSCY        EQU $ff42
-rSCX        EQU $ff43
-rDMA        EQU $ff46
-rBGP        EQU $ff47
-rOBP0       EQU $ff48
-rOBP1       EQU $ff49
-rIE         EQU $ffff
-
-size_font	      EQU $0600
-size_symbols      EQU $0200
-tilemap           EQU $9800
-template_tilemap  EQU $98A1
-game_name         EQU $98E1
-mbc_name          EQU $9981
-
-name      EQUS "GBlink2"
-sq_0      EQU $00
-arrow_u   EQU $01
-arrow_d   EQU $02
-arrow_r   EQU $03
-arrow_l   EQU $04
-line_h    EQU $05
-line_v    EQU $06
-corner_tl EQU $07
-corner_tr EQU $08
-corner_br EQU $09
-corner_bl EQU $0a
-tee_u     EQU $0b
-tee_r     EQU $0c
-tee_d     EQU $0d
-tee_l     EQU $0e
-sq_1      EQU $0f
-sq_2      EQU $10
-sq_3      EQU $11
-clock_nw  EQU $12
-clock_sw  EQU $13
-clock_ne  EQU $14
-clock_se  EQU $15
-
-RSYM: MACRO
-IF DEF(RSYM_FUNC)
-RSYM_END EQUS "_end_{RSYM_FUNC}_rom:\n"
-RSYM_DEF EQUS "{RSYM_FUNC}::\n\tds _end_{RSYM_FUNC}_rom - _{RSYM_FUNC}_rom\n"
-RSYM_END
-SECTION "code_ram",WRAM0
-RSYM_DEF
-PURGE RSYM_END
-PURGE RSYM_DEF
-PURGE RSYM_FUNC
-ENDC
-
-RSYM_FUNC EQUS "\1"
-SECTION "code_rom",ROM0
-_\1_rom:
-ENDM
-
-SET_RAM: MACRO
-	ld a, \2 & $FF
-	ld [\1], a
-	ld a, \2 >> 8
-	ld [\1 + 1], a
-ENDM
-
-WAIT_SERIAL: MACRO
-	ld a, $80
-	ldio [rSC], a
-.serloop:
-	ldio a, [rSC]
-	bit 7, a
-	jr nz, .serloop
-ENDM
+INCLUDE "common.s"
 
 SECTION "boot",ROM0[$100]
 	jp _start
+
+SECTION "header",ROM0[$134]
+	db "{name}"
+REPT ($f - strlen("{name}"))
+	db 0
+ENDR
+	db $00 ; TODO: CGB support
+	db $00, $00 ; Licensee code
+	db $00 ; SGB flag
+	db $00, $00, $00 ; MBC, ROM size, RAM size
+	db $01 ; Destination code
+	db $33 ; Use new licensee code
+	db $00 ; Version
 
 SECTION "main",ROM0[$150]
 _start:
@@ -106,12 +43,12 @@ _start:
 
 	ld hl, oam_dma_rom
 	ld bc, oam_dma
-	ld de, end_oam_dma_rom - oam_dma_rom
+	ld de, oam_dma_rom.end - oam_dma_rom
 	call copy
 
 	ld hl, indirect_call_rom
 	ld bc, indirect_call
-	ld de, end_indirect_call_rom - indirect_call_rom
+	ld de, indirect_call_rom.end - indirect_call_rom
 	call copy
 
 	ld hl, command_table_rom
@@ -134,7 +71,7 @@ _start:
 	call copy
 
 	ld hl, header_oam
-	ld bc, oam_start
+	ld bc, oam_header
 	ld de, end_header_oam - header_oam
 	call copy
 	call oam_dma
@@ -161,449 +98,7 @@ _start:
 	ldio [rIE], a
 	jp runloop
 
-indirect_call_rom:
-	push bc
-	ret
-end_indirect_call_rom:
-
-SECTION "code_ram",WRAM0
-code_ram::
-
-	RSYM runloop
-code_rom::
-.serial
-	ld a, $b4
-	ldio [rSB], a
-	ld a, $80
-	ldio [rSC], a
-
-.test
-	halt
-	ld hl, rIF
-	ld a, [hl]
-
-.test3
-	bit 3, a
-	jr z, .test0
-	res 3, [hl]
-	call serial_irq
-	jr .serial
-
-.test0
-	bit 0, a
-	jr z, .test
-	res 0, [hl]
-	call nz, vblank_irq
-	jr .test
-
-	RSYM vblank_irq
-	push bc
-	call read_buttons
-	ld b, a
-	ld a, [down_buttons]
-	and a, b
-	ld a, b
-	ld [down_buttons], a
-	bit 3, a
-	call nz, reload_rom_info
-	ld a, [info_outdated]
-	or a
-	call nz, update_rom_info
-	ld a, [oam_outdated]
-	or a
-	call nz, oam_dma
-	pop bc
-	ret
-
-	RSYM serial_irq
-	push bc
-	push hl
-	ldio a, [rSB]
-	ld l, a
-	ld h, $0
-	add hl, hl
-	ld bc, command_table
-	add hl, bc
-	inc hl
-	ld a, [hl-]
-	or a
-	jr z, .ret
-	ld b, a
-	ld a, [hl]
-	ld c, a
-	call indirect_call
-.ret
-	pop hl
-	pop bc
-	ret
-
-	RSYM read_buttons
-	ld a, $20
-	ldio [rJOYP], a
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	cpl
-	and a, $f
-	swap a
-	ld b, a
-	ld a, $10
-	ldio [rJOYP], a
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	ldio a, [rJOYP]
-	cpl
-	and a, $f
-	or a, b
-	ret
-
-	RSYM test_link
-	call reload_rom_info
-	ld a, $1d
-	call write_byte
-	SET_RAM range_start, rom_info
-	SET_RAM range_size, $15
-	call dump_range
-	xor a
-	call write_byte
-	ld a, $ff
-	call write_byte
-	ret
-
-	RSYM init_link
-	push af
-	call test_link
-	SET_RAM range_start, 0
-	SET_RAM range_size, $4000
-	call dump_range
-.ret:
-	pop af
-	ret
-
-	RSYM init_link_2
-	push af
-	call test_link
-	pop af
-	ret
-
-	RSYM dump_range
-	push af
-	push bc
-	push de
-	push hl
-	ld hl, sp+0
-	ld sp, range_start
-	pop de
-	pop bc
-	ld sp, hl
-	ld h, d
-	ld l, e
-.loop:
-	ld a, [hl+]
-	dec bc
-	ldio [rSB], a
-	WAIT_SERIAL
-	xor a
-	or b
-	or c
-	jr z, .ret
-	jr .loop
-.ret:
-	pop hl
-	pop de
-	pop bc
-	pop af
-	ret
-
-	RSYM load_range
-	push af
-	push bc
-	push de
-	push hl
-	ld hl, sp+0
-	ld sp, range_start
-	pop de
-	pop bc
-	ld sp, hl
-	ld h, d
-	ld l, e
-.loop:
-	call read_byte
-	ld [hl+], a
-	dec bc
-	xor a
-	or b
-	or c
-	jr z, .ret
-	jr .loop
-.ret:
-	pop hl
-	pop de
-	pop bc
-	pop af
-	ret
-
-	RSYM write_byte
-	ldio [rSB], a
-	WAIT_SERIAL
-	ret
-
-	RSYM read_byte
-	WAIT_SERIAL
-	ldio a, [rSB]
-	ret
-
-	RSYM exc_byte
-	ldio [rSB], a
-	WAIT_SERIAL
-	ldio a, [rSB]
-	ret
-
-	RSYM read_args
-	push af
-	push bc
-	push de
-	push hl
-	ld hl, arguments
-	ld d, a
-.loop:
-	xor a
-	ld b, a
-	call read_byte
-	ld c, a
-	dec d
-	jr z, .write
-	call read_byte
-	ld b, a
-	dec d
-.write:
-	ld a, b
-	ld [hl+], a
-	ld a, c
-	ld [hl+], a
-	xor a
-	or d
-	jr nz, .loop
-	pop hl
-	pop de
-	pop bc
-	pop af
-	ret
-
-	RSYM read_1
-	push af
-	ld a, 2
-	call read_args
-	SET_RAM range_size, $1
-	call dump_range
-	pop af
-	ret
-
-	RSYM read_x
-	push af
-	ld a, 4
-	call read_args
-	call dump_range
-	pop af
-	ret
-
-	RSYM write_1
-	push af
-	push bc
-	ld a, 3
-	call read_args
-	ld hl, sp+0
-	ld sp, range_start
-	pop bc
-	pop af
-	ld sp, hl
-	ld [bc], a
-	pop bc
-	pop af
-	ret
-
-	RSYM do_call
-	push af
-	push bc
-	push hl
-	ld a, 2
-	call read_args
-	ld hl, arguments
-	ld a, [hl+]
-	ld c, a
-	ld b, [hl]
-	call indirect_call
-	pop hl
-	pop bc
-	pop af
-	ret
-
-	RSYM reload_rom_info
-	push af
-	push bc
-	push de
-	push hl
-	ld hl, rom_info
-	ld bc, $147
-	ld a, [bc]
-	ld [hl+], a
-	inc bc
-	ld a, [bc]
-	ld [hl+], a
-	inc bc
-	ld a, [bc]
-	ld [hl+], a
-	inc bc
-
-	ld bc, $14e
-	ld a, [bc]
-	ld [hl+], a
-	inc bc
-	ld a, [bc]
-	ld [hl+], a
-	inc bc
-
-	ld d, 0
-	ld e, $10
-	ld bc, $134
-.nameloop:
-	ld a, [bc]
-	ld [hl+], a
-	inc bc
-	cpl
-	or d
-	ld d, a
-	dec e
-	jr nz, .nameloop
-
-	xor a
-	or d
-	ld a, 3
-	jr z, .mark_outdated
-	srl a
-.mark_outdated
-	ld [info_outdated], a
-	pop hl
-	pop de
-	pop bc
-	pop af
-	ret
-
-	RSYM update_rom_info
-	push bc
-	ld b, a
-	ldio a, [rSTAT]
-	and a, $3
-	cp a, $1
-	jr nz, .ret2
-	push de
-	push hl
-	ld hl, game_name
-	ld d, b
-	ld bc, rom_info + 5
-	ld e, $10
-
-	bit 1, d
-	jr z, .namecopy
-	ld bc, name_none
-
-.namecopy:
-	ld a, [bc]
-	ld [hl+], a
-	inc bc
-	dec e
-	jr nz, .namecopy
-
-	ld a, [rom_info]
-	ld c, a
-	bit 1, d
-	jr z, .mbcload
-	ld bc, name_none
-	jr .copystart
-.mbcload:
-	xor a
-	ld b, a
-	ld hl, mbc_table
-	add hl, bc
-	add hl, bc
-	ld a, [hl+]
-	ld c, a
-	ld b, [hl]
-.copystart:
-	ld hl, mbc_name
-	ld d, 20
-.copyloop
-	ld a, [bc]
-	or a
-	jr z, .zeroloop
-	inc bc
-	ld [hl+], a
-	dec d
-	jr .copyloop
-.zeroloop:
-	ld [hl+], a
-	dec d
-	jr nz, .zeroloop
-
-.ret:
-	xor a
-	ld [info_outdated], a
-	pop hl
-	pop de
-.ret2:
-	pop bc
-	ret
-
-	RSYM name_none
-	db "(no cartridge)",0
-
-	RSYM show_busy
-	push af
-	push bc
-	push de
-	push hl
-	ld hl, clock_oam_buffer
-	ld bc, oam_clock
-	ld d, $10
-.loop:
-	ld a, [hl+]
-	ld [bc], a
-	inc bc
-	dec d
-	jr nz, .loop
-	ld a, $1
-	ld [oam_outdated], a
-	pop hl
-	pop de
-	pop bc
-	pop af
-	ret
-
-	RSYM hide_busy
-	push af
-	push bc
-	push hl
-	ld hl, oam_clock
-	ld b, $10
-	xor a
-.loop:
-	ld [hl+], a
-	dec b
-	jr nz, .loop
-	ld a, $1
-	ld [oam_outdated], a
-	pop hl
-	pop bc
-	pop af
-	ret
-
-end_code_rom:
-	ds 1 ; Make sure the symbol is in the right place
-	RSYM _
-
-SECTION "utils",ROM0[$400]
+SECTION "utils",ROM0[$60]
 copy:
 	push hl
 	push bc
@@ -630,6 +125,7 @@ zero:
 	jr nz, zero
 	ret
 
+SECTION "template",ROM0
 header:
 ; Row 0
 REPT ($14 - strlen("{name}")) / 2
@@ -674,7 +170,6 @@ ENDR
 	ds 1
 ENDM
 
-
 template_text:
 	underline "Current game:"
 	ds $60
@@ -709,58 +204,35 @@ clock_oam:
 	db clock_se, $10
 end_clock_oam:
 
-oam_dma_rom:
-	ld a, oam_start / $100
-	ld [rDMA], a
-	ld a, $28
-.loop
-	dec a
-	jr nz, .loop
-	ld [oam_outdated], a
-	ret
-end_oam_dma_rom
-
-SECTION "ram",WRAM0[$C800]
-command_table:
+SECTION "tables",WRAM0
+command_table::
 	ds $200
-oam_start:
-	ds $10
-oam_clock:
-	ds $10
-oam_reserved:
-	ds $80
-clock_oam_buffer:
-	ds $10
 mbc_table::
 	ds $340
-down_buttons:
+
+SECTION "wram",WRAM0
+down_buttons::
 	ds 1
-rom_info:
+rom_info::
 	ds $15
-info_outdated:
+info_outdated::
 	ds 1
-oam_outdated:
+oam_outdated::
 	ds 1
-arguments:
-range_start:
+arguments::
+range_start::
 	ds 2
-range_size:
-single_byte:
+range_size::
+single_byte::
 	ds 2
+clock_oam_buffer::
+	ds $10
 
-SECTION "tilerom",ROM0
-symbols:
-INCBIN "symbols.2bpp"
-font:
-INCBIN "font.2bpp"
-
-SECTION "tiles",VRAM[$8000]
-tiles:
-	ds size_symbols
-	ds size_font
-
-SECTION "oam_dma",HRAM
-oam_dma:
-	ds end_oam_dma_rom - oam_dma_rom
-indirect_call:
-	ds end_indirect_call_rom - indirect_call_rom
+SECTION "oam_buffer",WRAM0[$C000]
+oam_start::
+oam_header::
+	ds $10
+oam_clock::
+	ds $10
+oam_reserved::
+	ds $80
